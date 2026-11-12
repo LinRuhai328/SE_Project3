@@ -332,11 +332,12 @@ class Store:
     def update_record(self, rec: TransactionRecord) -> None:
         self.conn.execute(
             "UPDATE records SET state=?, direction=?, amount=?, occurred_on=?, category_id=?,"
-            " txn_no=?, version=?, replaced_by=?, void_reason=?, reject_reason=?,"
-            " remark=?, updated_at=? WHERE record_id=?",
+            " txn_no=?, operation_id=?, version=?, replaced_by=?, void_reason=?,"
+            " reject_reason=?, remark=?, updated_at=? WHERE record_id=?",
             (rec.state.value, rec.direction.value, str(rec.amount), rec.occurred_on.isoformat(),
-             rec.category_id, rec.txn_no, rec.version, rec.replaced_by, rec.void_reason,
-             rec.reject_reason, rec.remark, rec.updated_at.isoformat(), rec.record_id),
+             rec.category_id, rec.txn_no, rec.operation_id, rec.version, rec.replaced_by,
+             rec.void_reason, rec.reject_reason, rec.remark, rec.updated_at.isoformat(),
+             rec.record_id),
         )
 
     def _row_to_record(self, row: sqlite3.Row) -> TransactionRecord:
