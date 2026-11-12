@@ -80,11 +80,25 @@ class QueryService:
 
     # ------------------------------------------------------------ 明细
     def query(self, ledger_id: str, flt: Optional[RecordFilter] = None) -> list[TransactionRecord]:
-        """按条件筛明细。默认只看有效记录，勾选后可以查草稿与历史版本。"""
-        rows = self.store.list_records(ledger_id)
+        """按条件筛明细。默认只看有效记录，勾选后可以查草稿与历史版本。
+
+        条件全部下推给 SQL；如果要求包含非有效记录，才退回到逐行判断。
+        """
         if flt is None:
             flt = RecordFilter()
-        return [r for r in rows if flt.matches(r)]
+        if flt.include_non_effective:
+            rows = self.store.list_records(ledger_id)
+            return [r for r in rows if flt.matches(r)]
+        return self.store.query_records(
+            ledger_id,
+            category_id=flt.category_id,
+            member_id=flt.member_id,
+            start=flt.start,
+            end=flt.end,
+            min_amount=flt.min_amount,
+            max_amount=flt.max_amount,
+            effective_only=True,
+        )
 
     def query_one_day(self, ledger_id: str, day: date) -> list[TransactionRecord]:
         return self.query(ledger_id, RecordFilter(start=day, end=day))

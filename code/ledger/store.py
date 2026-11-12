@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS records (
 
 CREATE INDEX IF NOT EXISTS idx_records_ledger ON records(ledger_id, state);
 CREATE INDEX IF NOT EXISTS idx_records_period ON records(ledger_id, occurred_on);
+CREATE INDEX IF NOT EXISTS idx_records_effective
+    ON records(ledger_id, state, occurred_on, category_id, user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_records_op
     ON records(ledger_id, operation_id) WHERE operation_id IS NOT NULL;
 
@@ -174,11 +176,17 @@ def _d(value: str) -> date:
 class Store:
     """对 sqlite3 的薄封装，统一事务与行映射。"""
 
-    def __init__(self, path: str = ":memory:") -> None:
+    def __init__(self, path: str = ":memory:", init: bool = True) -> None:
+        """init=False 用于已经建过库的连接，避免每个请求都跑一遍建表脚本。"""
         self.conn = sqlite3.connect(path, detect_types=0)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
-        self.conn.executescript(SCHEMA)
+        if path != ":memory:":
+            # WAL 让读操作不阻塞其他连接，并发查询时才不会互相排队
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA synchronous=NORMAL")
+        if init:
+            self.conn.executescript(SCHEMA)
         self.conn.commit()
 
     # ---------------------------------------------------------------- 事务
@@ -381,6 +389,58 @@ class Store:
             params.extend(values)
         rows = self.conn.execute(sql + " ORDER BY occurred_on, created_at", params).fetchall()
         return [self._row_to_record(r) for r in rows]
+
+    def query_records(self, ledger_id: str, *, category_id: Optional[str] = None,
+                      member_id: Optional[str] = None, start: Optional[date] = None,
+                      end: Optional[date] = None, min_amount: Optional[Decimal] = None,
+                      max_amount: Optional[Decimal] = None,
+                      effective_only: bool = True) -> list[TransactionRecord]:
+        """条件查询下推到 SQL。
+
+        早期版本把整本账读进内存再过滤，一万条记录下 20 个并发查询会退化成
+        几十秒，因此这里改成 WHERE 条件，只把命中的行读出来。
+        """
+        sql = ["SELECT * FROM records WHERE ledger_id=?"]
+        params: list[object] = [ledger_id]
+        if effective_only:
+            sql.append("AND state='approved' AND void_reason IS NULL AND replaced_by IS NULL")
+        if category_id:
+            sql.append("AND category_id=?")
+            params.append(category_id)
+        if member_id:
+            sql.append("AND user_id=?")
+            params.append(member_id)
+        if start:
+            sql.append("AND occurred_on >= ?")
+            params.append(start.isoformat())
+        if end:
+            sql.append("AND occurred_on <= ?")
+            params.append(end.isoformat())
+        if min_amount is not None:
+            sql.append("AND CAST(amount AS REAL) >= ?")
+            params.append(float(min_amount))
+        if max_amount is not None:
+            sql.append("AND CAST(amount AS REAL) <= ?")
+            params.append(float(max_amount))
+        sql.append("ORDER BY occurred_on, created_at")
+        rows = self.conn.execute(" ".join(sql), params).fetchall()
+        return [self._row_to_record(r) for r in rows]
+
+    def aggregate_records(self, ledger_id: str, *, start: Optional[date] = None,
+                          end: Optional[date] = None) -> list[sqlite3.Row]:
+        """按月/分类/成员聚合时用，避免把明细全部取到 Python 里再遍历。"""
+        sql = ["SELECT direction, category_id, user_id, SUM(CAST(amount AS REAL)) AS total,"
+               " COUNT(*) AS cnt FROM records WHERE ledger_id=?"
+               " AND state='approved' AND void_reason IS NULL AND replaced_by IS NULL"]
+        params: list[object] = [ledger_id]
+        if start:
+            sql.append("AND occurred_on >= ?")
+            params.append(start.isoformat())
+        if end:
+            sql.append("AND occurred_on <= ?")
+            params.append(end.isoformat())
+        sql.append("GROUP BY direction, category_id, user_id")
+        return self.conn.execute(" ".join(sql), params).fetchall()
 
     # ---------------------------------------------------------------- 更正
     def add_correction(self, c: Correction) -> None:
