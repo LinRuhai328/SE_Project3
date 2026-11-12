@@ -328,6 +328,21 @@ HANDLERS = {
     "settle": cmd_settle,
 }
 
+# 模拟用户走流程时发现的问题：只给错误码，用户不知道下一步做什么。
+# 这里按错误码补一句可执行的提示，不影响退出码与错误码本身。
+HINTS = {
+    "USER_NOT_FOUND": "先执行 user add 注册，或用 user list 查看已有标识",
+    "LEDGER_NOT_FOUND": "用 ledger list 查看账本标识",
+    "CATEGORY_NOT_FOUND": "用 category list 查看类别，或先 category add 新建",
+    "RECORD_NOT_FOUND": "用 query list 查看记录标识",
+    "NOT_MEMBER": "该账号不在此账本中，需由所有者用 member invite 邀请",
+    "PERMISSION_DENIED": "当前角色无此权限，member / admin / owner 权限依次递增",
+    "PERIOD_LOCKED": "该月已结算，需所有者执行 settle reopen 后才能修改",
+    "PENDING_EXISTS": "先处理待审核记录，或让提交人撤回",
+    "AMOUNT_NOT_POSITIVE": "金额必须大于 0，支出与收入用 --direction 区分",
+    "DATE_FUTURE": "发生日期不能晚于今天",
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
@@ -336,7 +351,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return HANDLERS[args.command](args, svc)
     except DomainError as exc:
-        print(json.dumps({"error": exc.code, "message": exc.message}, ensure_ascii=False))
+        payload = {"error": exc.code, "message": exc.message}
+        hint = HINTS.get(exc.code)
+        if hint:
+            payload["hint"] = hint
+        print(json.dumps(payload, ensure_ascii=False))
         return 2
     finally:
         svc["store"].close()

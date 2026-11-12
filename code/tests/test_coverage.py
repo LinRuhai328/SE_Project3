@@ -267,3 +267,12 @@ def test_store_helpers(w):
     assert w.store.get_record("R-missing") is None
     assert w.store.get_invite("T-missing") is None
     assert w.store.find_user_by_email("nobody@nju.edu.cn") is None
+
+
+def test_cli_error_carries_hint(tmp_path: Path, capsys):
+    db = str(tmp_path / "hint.db")
+    code, payload = run(capsys, "--db", db, "ledger", "create",
+                        "--owner", "U-none", "--name", "演示")
+    assert code == 2
+    assert payload["error"] == "USER_NOT_FOUND"
+    assert "hint" in payload
