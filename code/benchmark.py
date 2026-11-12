@@ -118,6 +118,32 @@ def run_concurrent(db_path: str, ledger_id: str, category_id: str) -> list[float
     return timings
 
 
+def _process_worker(job: tuple[str, str, int]) -> list[float]:
+    """子进程入口。放在模块顶层是为了 Windows 的 spawn 模式能序列化。"""
+    db_path, ledger_id, count = job
+    store = Store(db_path, init=False)
+    query = QueryService(store)
+    local = []
+    for _ in range(count):
+        flt = RecordFilter(start=date(2025, 5, 1), end=date(2025, 9, 1),
+                           min_amount=Decimal("5.00"))
+        t0 = time.perf_counter()
+        query.query(ledger_id, flt)
+        local.append(time.perf_counter() - t0)
+    store.close()
+    return local
+
+
+def run_multiprocess(db_path: str, ledger_id: str) -> list[float]:
+    """多进程版本：验证并发瓶颈是不是 Python 的 GIL。"""
+    from multiprocessing import Pool
+
+    jobs = [(db_path, ledger_id, QUERIES // THREADS)] * THREADS
+    with Pool(processes=THREADS) as pool:
+        chunks = pool.map(_process_worker, jobs)
+    return [t for chunk in chunks for t in chunk]
+
+
 def report(name: str, timings: list[float]) -> None:
     timings_sorted = sorted(timings)
     p95 = timings_sorted[int(len(timings_sorted) * 0.95) - 1]
@@ -136,6 +162,7 @@ def main() -> None:
     print("数据准备完成")
     report("串行 100 次查询", run_sequential(DB, ledger_id, category_id))
     report(f"并发 {THREADS} 线程共 {QUERIES} 次查询", run_concurrent(DB, ledger_id, category_id))
+    report(f"并发 {THREADS} 进程共 {QUERIES} 次查询", run_multiprocess(DB, ledger_id))
     os.remove(DB)
 
 
