@@ -153,7 +153,8 @@ class User:
         email = email.strip().lower()
         if "@" not in email:
             raise DomainError("EMAIL_INVALID", "邮箱格式不正确")
-        return User(user_id=new_id("U"), email=email, nickname=nickname.strip() or email.split("@")[0])
+        display = nickname.strip() or email.split("@")[0]
+        return User(user_id=new_id("U"), email=email, nickname=display)
 
 
 @dataclass

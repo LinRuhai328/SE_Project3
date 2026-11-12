@@ -10,10 +10,9 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
-from typing import Iterable, Optional
+from typing import Optional
 
 from .models import (
-    Category,
     Direction,
     DomainError,
     RecordState,
@@ -186,7 +185,8 @@ class QueryService:
             "at": e.occurred_at.strftime("%Y-%m-%d %H:%M"),
         } for e in entries]
 
-    def audit_for_member(self, ledger_id: str, user_id: str, limit: int = 50) -> list[dict[str, object]]:
+    def audit_for_member(self, ledger_id: str, user_id: str,
+                         limit: int = 50) -> list[dict[str, object]]:
         """普通成员只能查自己发起的操作；管理员与所有者可查全量。"""
         from .permissions import Action, ROLE_ACTIONS
 

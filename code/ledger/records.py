@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
 from typing import Optional
 
 from . import audit, permissions
@@ -22,10 +21,8 @@ from .models import (
     RecordState,
     TransactionRecord,
     new_id,
-    now,
     parse_amount,
     parse_occurred_on,
-    today,
 )
 from .permissions import Action
 from .store import Store
@@ -68,7 +65,8 @@ class RecordService:
     def _assert_txn_available(self, ledger_id: str, txn_no: str) -> None:
         """同一交易号在“待审核或已审核未作废”中最多一条。"""
         for other in self.store.find_by_txn_no(ledger_id, txn_no):
-            if other.state in {RecordState.PENDING, RecordState.APPROVED} and other.void_reason is None:
+            occupied = {RecordState.PENDING, RecordState.APPROVED}
+            if other.state in occupied and other.void_reason is None:
                 raise DomainError("TXN_DUPLICATED", f"交易号 {txn_no} 已被占用")
 
     # ------------------------------------------------------------ 新增
@@ -228,7 +226,8 @@ class RecordService:
         return rec
 
     # ------------------------------------------------------------ 作废
-    def void(self, ledger_id: str, operator_id: str, record_id: str, reason: str) -> TransactionRecord:
+    def void(self, ledger_id: str, operator_id: str, record_id: str,
+             reason: str) -> TransactionRecord:
         """作废已审核记录。作废后不计入统计，记录本身保留。"""
         text = audit.assert_reason(reason)
         rec = self._record(record_id)

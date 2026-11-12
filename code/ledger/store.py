@@ -296,7 +296,9 @@ class Store:
         )
 
     def get_category(self, category_id: str) -> Optional[Category]:
-        row = self.conn.execute("SELECT * FROM categories WHERE category_id=?", (category_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT * FROM categories WHERE category_id=?", (category_id,)
+        ).fetchone()
         if row is None:
             return None
         return Category(row["category_id"], row["ledger_id"], row["name"], bool(row["disabled"]))
@@ -311,7 +313,8 @@ class Store:
         rows = self.conn.execute(
             "SELECT * FROM categories WHERE ledger_id=? ORDER BY name", (ledger_id,)
         ).fetchall()
-        return [Category(r["category_id"], r["ledger_id"], r["name"], bool(r["disabled"])) for r in rows]
+        return [Category(r["category_id"], r["ledger_id"], r["name"],
+                         bool(r["disabled"])) for r in rows]
 
     def disable_category(self, category_id: str) -> None:
         self.conn.execute("UPDATE categories SET disabled=1 WHERE category_id=?", (category_id,))

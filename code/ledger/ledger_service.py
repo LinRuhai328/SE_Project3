@@ -151,7 +151,8 @@ class LedgerService:
         row = self.store.get_invite(token)
         if row is None:
             raise DomainError("INVITE_NOT_FOUND", "邀请不存在")
-        if row["revoked"] or row["used_by"] is not None or datetime.now() > row["expires_at"]:  # type: ignore[operator]
+        expired = datetime.now() > row["expires_at"]  # type: ignore[operator]
+        if row["revoked"] or row["used_by"] is not None or expired:
             raise DomainError("INVITE_EXPIRED", "邀请已过期或被撤销")
         ledger_id = str(row["ledger_id"])
         role = row["role"]

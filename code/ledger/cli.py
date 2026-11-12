@@ -250,7 +250,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ledger.add_argument("--user")
 
     p_member = sub.add_parser("member", help="成员与权限")
-    p_member.add_argument("action", choices=["invite", "accept", "list", "role", "transfer", "leave"])
+    p_member.add_argument("action", choices=[
+        "invite", "accept", "list", "role", "transfer", "leave"])
     p_member.add_argument("--ledger")
     p_member.add_argument("--user")
     p_member.add_argument("--email")
