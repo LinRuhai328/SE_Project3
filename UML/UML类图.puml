@@ -1,0 +1,231 @@
+@startuml UML类图
+' 多人共享记账系统 —— 领域类图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title 多人共享记账系统 类图
+
+package "用户与权限" {
+  class User <<实体>> {
+    - userId : String
+    - nickname : String
+    - email : String
+    - createdAt : DateTime
+    + register() : void
+    + login(password) : Session
+    + logout(session) : void
+  }
+
+  class Ledger <<实体>> {
+    - ledgerId : String
+    - name : String
+    - type : LedgerType
+    - archived : boolean
+    - createdAt : DateTime
+    + archive(operator : User) : void
+    + restore(operator : User) : void
+    + isWritable() : boolean
+  }
+
+  class Membership <<关联实体>> {
+    - membershipId : String
+    - role : RoleType
+    - joinedAt : DateTime
+    - leftAt : DateTime
+    + hasPermission(perm : Permission) : boolean
+    + transferOwnership(target : Membership) : void
+    + leave() : void
+  }
+
+  enum LedgerType {
+    个人
+    共享
+  }
+
+  enum RoleType {
+    所有者
+    管理员
+    普通成员
+  }
+
+  enum Permission {
+    创建账本
+    邀请成员
+    审核记录
+    更正记录
+    作废记录
+    设置预算
+    执行结算
+    重开账期
+    查看审计日志
+  }
+}
+
+package "账目与状态" {
+  class TransactionRecord <<实体>> {
+    - recordId : String
+    - amount : Money
+    - direction : Direction
+    - occurredOn : Date
+    - state : RecordState
+    - txnNo : String
+    - operationId : String
+    - remark : String
+    + submit() : void
+    + withdraw() : void
+    + approve(reviewer : User) : void
+    + reject(reviewer : User, reason : String) : void
+    + void(reason : String) : void
+    + isEffective() : boolean
+  }
+
+  class Correction <<实体>> {
+    - correctionId : String
+    - reason : String
+    - oldSnapshot : String
+    - newSnapshot : String
+    - status : CorrectionStatus
+    + approve(reviewer : User) : void
+    + reject(reviewer : User, reason : String) : void
+    + apply() : void
+  }
+
+  enum Direction {
+    收入
+    支出
+  }
+
+  enum RecordState {
+    草稿
+    待审核
+    已审核
+    已驳回
+    已撤回
+    已作废
+  }
+
+  enum CorrectionStatus {
+    待审核
+    已通过
+    已驳回
+  }
+
+  class Category <<实体>> {
+    - categoryId : String
+    - name : String
+    - disabled : boolean
+    + rename(newName : String) : void
+    + disable() : void
+  }
+}
+
+package "统计与结算" {
+  class Budget <<实体>> {
+    - budgetId : String
+    - period : YearMonth
+    - amount : Money
+    + remaining(spent : Money) : Money
+    + isOverrun(spent : Money) : boolean
+  }
+
+  class Settlement <<实体>> {
+    - settlementId : String
+    - period : YearMonth
+    - totalExpense : Money
+    - totalIncome : Money
+    - locked : boolean
+    - version : int
+    + lock() : void
+    + reopen(operator : User, reason : String) : void
+    + snapshot() : SettlementSnapshot
+  }
+
+  class SettlementSnapshot <<值对象>> {
+    - period : YearMonth
+    - expenseByCategory : Map
+    - expenseByMember : Map
+    - valid : boolean
+  }
+
+  class StatisticsService <<服务>> {
+    + monthlySummary(ledger, period) : Summary
+    + byCategory(ledger, filter) : List
+    + byMember(ledger, filter) : List
+    + query(filter : RecordFilter) : Page
+  }
+
+  class RecordFilter <<值对象>> {
+    - categoryId : String
+    - memberId : String
+    - from : Date
+    - to : Date
+    - minAmount : Money
+    - maxAmount : Money
+    - includeNonEffective : boolean
+  }
+}
+
+package "审计与通知" {
+  class AuditLog <<实体>> {
+    - logId : String
+    - actorId : String
+    - action : String
+    - target : String
+    - result : String
+    - before : String
+    - after : String
+    - occurredAt : DateTime
+    + append() : void
+  }
+
+  class ImportBatch <<实体>> {
+    - batchId : String
+    - evidenceNo : String
+    - candidateCount : int
+    + parse(image) : List
+    + markProcessed(rows : List) : void
+  }
+
+  class Notification <<实体>> {
+    - notificationId : String
+    - type : NotificationType
+    - deliveredAt : DateTime
+    + dispatch() : void
+    + resend() : void
+  }
+
+  enum NotificationType {
+    审核结果
+    账目生效
+    成员变动
+    预算超支
+    结算重开
+  }
+}
+
+User "1" -- "0..*" Membership : 拥有
+Ledger "1" -- "1..*" Membership : 成员关系
+Membership "1" -- "1" RoleType
+Ledger "1" -- "0..*" TransactionRecord : 包含
+Ledger "1" -- "0..*" Category : 维护
+Ledger "1" -- "0..*" Budget : 设置
+Ledger "1" -- "0..*" Settlement : 结算
+TransactionRecord "1" -- "0..*" Correction : 更正链
+TransactionRecord "1" -- "1" Category
+Settlement "1" -- "1" SettlementSnapshot : 冻结
+ImportBatch "1" -- "0..*" TransactionRecord : 生成候选
+User "1" -- "0..*" AuditLog : 产生
+User "1" -- "0..*" Notification : 接收
+StatisticsService ..> TransactionRecord : 读取
+StatisticsService ..> SettlementSnapshot : 读取
+AuditLog ..> TransactionRecord : 记录变更
+
+note bottom of TransactionRecord
+  状态转换：草稿→待审核→已审核／已驳回；
+  待审核可撤回；已审核可作废或发起更正；
+  任何状态不得回退到草稿。
+end note
+
+@enduml

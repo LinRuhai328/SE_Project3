@@ -1,0 +1,77 @@
+@startuml UML用例图
+' 多人共享记账系统 —— 用例图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title 多人共享记账系统 用例图
+
+actor "普通成员" as Member
+actor "管理员" as Admin
+actor "所有者" as Owner
+actor "系统" as System <<系统>>
+
+rectangle "多人共享记账系统" {
+  usecase "创建个人/共享账本" as UC01
+  usecase "邀请成员并设置有效期" as UC02
+  usecase "退出账本 / 移交所有权" as UC03
+  usecase "新增收支记录" as UC04
+  usecase "提交记录进入审核" as UC05
+  usecase "审核通过" as UC06
+  usecase "驳回并填写原因" as UC07
+  usecase "撤回待审核记录" as UC08
+  usecase "作废已审核记录" as UC09
+  usecase "发起更正并二次审核" as UC10
+  usecase "按类别/成员/日期/金额查询" as UC11
+  usecase "查看分类与成员统计" as UC12
+  usecase "设置月度预算" as UC13
+  usecase "按月结算并锁定" as UC14
+  usecase "填写原因重开账期" as UC15
+  usecase "截图导入并核对候选" as UC16
+  usecase "查看审计日志" as UC17
+  usecase "接收站内通知" as UC18
+}
+
+Member --> UC04
+Member --> UC05
+Member --> UC08
+Member --> UC11
+Member --> UC12
+Member --> UC16
+Member --> UC18
+
+Admin --> UC01
+Admin --> UC02
+Admin --> UC03
+Admin --> UC06
+Admin --> UC07
+Admin --> UC09
+Admin --> UC10
+Admin --> UC13
+Admin --> UC14
+Admin --> UC17
+
+Owner --> UC01
+Owner --> UC02
+Owner --> UC03
+Owner --> UC15
+Owner --> UC17
+
+UC06 ..> UC18 : <<include>>
+UC07 ..> UC18 : <<include>>
+UC14 ..> UC14 : 待审核存在时阻断
+UC09 ..> UC17 : <<include>>
+UC10 ..> UC06 : 二次审核
+UC15 ..> UC14 : 重开后重新结算
+
+note right of UC10
+  更正不得由提交人自行审核；
+  通过后旧版本保留可查。
+end note
+
+note bottom of UC14
+  结算只处理已结束月份；
+  锁定后新增、修改、作废、更正一律拒绝。
+end note
+
+@enduml

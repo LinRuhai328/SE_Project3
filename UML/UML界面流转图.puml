@@ -1,0 +1,53 @@
+@startuml UML界面流转图
+' 界面之间的跳转关系
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+
+title 界面流转图
+
+state "登录 / 注册" as Login
+state "账本列表" as List
+state "空状态引导" as Empty
+state "账本明细" as Detail
+state "新增记录" as Create
+state "校验提示" as Err
+state "审核队列" as Review
+state "统计分析" as Stat
+state "预算与结算" as Settle
+state "成员与权限" as Member
+state "作废确认" as VoidConfirm
+state "手机端明细" as Mobile
+
+[*] --> Login
+Login --> List : 登录成功
+Login --> Login : 账号或密码错误
+List --> Empty : 账号下无账本
+Empty --> List : 新建或加入成功
+List --> Detail : 进入某个账本
+List --> Mobile : 窄屏自动切换
+Detail --> Create : 新增
+Detail --> VoidConfirm : 作废已审核记录
+Detail --> Detail : 筛选 / 翻页
+Create --> Err : 字段校验失败
+Err --> Create : 按提示修改
+Create --> Detail : 提交成功（待审核）
+Detail --> Review : 有待审核时
+Review --> Detail : 通过 / 驳回后返回
+Detail --> Stat : 切到统计
+Detail --> Settle : 切到预算与结算
+Detail --> Member : 切到成员
+Settle --> Settle : 结算 / 重开账期
+Member --> Member : 邀请 / 改角色 / 移交
+
+note right of Err
+  三处同时报错：
+  金额精度、日期越界、
+  类别已停用。
+end note
+
+note bottom of VoidConfirm
+  不可逆操作，
+  必须复述对象 + 必填原因。
+end note
+
+@enduml

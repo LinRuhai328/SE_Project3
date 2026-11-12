@@ -1,0 +1,51 @@
+@startuml UML状态图
+' 收支记录状态图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+
+title 收支记录 状态图
+
+state "草稿" as Draft
+state "待审核" as Pending
+state "已审核" as Approved
+state "已驳回" as Rejected
+state "已撤回" as Withdrawn
+state "已作废" as Voided
+
+[*] --> Draft : 新建记录\n（仅本人可见）
+
+Draft --> Pending : 提交\n（共享账本，占用交易号）
+Draft --> Approved : 提交\n（个人账本，本人确认即生效）
+Draft --> Draft : 编辑字段\n（不改状态）
+
+Pending --> Approved : 审核通过\n（他人审核，禁止自审）
+Pending --> Rejected : 驳回\n（必填原因）
+Pending --> Withdrawn : 撤回\n（提交人主动）
+
+Rejected --> Pending : 修改后重新提交
+Withdrawn --> Pending : 重新提交
+
+Approved --> Voided : 作废\n（管理员/所有者填原因）
+Approved --> Pending : 发起更正\n（不覆盖原值，审核后替换）
+Approved --> Approved : 更正被驳回\n（保持原值）
+
+Voided --> [*]
+Approved --> [*] : 账期结算后锁定\n（只读）
+
+note right of Pending
+  待审核状态同样占用交易号：
+  同一账本内同一交易号
+  只能存在一条有效记录。
+end note
+
+note bottom of Approved
+  已审核记录不直接修改；
+  更正生成新版本，旧版本保留可查。
+end note
+
+note right of Voided
+  作废后不计入统计与预算，
+  但记录与审计日志不删除。
+end note
+
+@enduml

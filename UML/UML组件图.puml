@@ -1,0 +1,70 @@
+@startuml UML组件图
+' 分层组件图
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+title 系统组件图（分层）
+
+package "表现层" {
+  [命令行界面\nCLI] as CLI
+  [Web 界面\n（后续实验）] as WEB
+}
+
+package "应用服务层" {
+  [账本服务\nLedgerService] as LS
+  [记录服务\nRecordService] as RS
+  [审核服务\nReviewService] as RV
+  [统计服务\nStatService] as ST
+  [结算服务\nSettlementService] as SS
+}
+
+package "领域层" {
+  [状态机\nRecordStateMachine] as SM
+  [权限判定\nPermissionPolicy] as PP
+  [金额与日期校验\nValidators] as VD
+}
+
+package "基础设施层" {
+  [仓储接口\nRepository] as REPO
+  [SQLite 实现] as DB
+  [审计日志\nAuditService] as AU
+  [通知\nNotificationService] as NT
+  [截图导入\nImportService] as IM
+}
+
+CLI --> LS
+CLI --> RS
+CLI --> ST
+WEB ..> CLI : 复用服务层
+
+LS --> REPO
+RS --> REPO
+RS --> SM
+RS --> PP
+RS --> VD
+RV --> SM
+RV --> PP
+RV --> AU
+SS --> REPO
+SS --> AU
+ST --> REPO
+
+REPO <|.. DB
+AU --> REPO
+NT --> REPO
+IM --> REPO
+
+note right of SM
+  六状态与允许的转换
+  集中在这一处，
+  服务层不得绕过。
+end note
+
+note bottom of DB
+  单文件 SQLite，
+  便于打包与后续实验的
+  性能测试。
+end note
+
+@enduml
