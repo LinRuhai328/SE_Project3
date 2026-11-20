@@ -6,3 +6,5 @@ __pycache__/
 实验三_软件实现与构建.pdf
 .pytest_cache/
 _demo.db
+_shot/
+_report.html
